@@ -1,0 +1,155 @@
+---
+title: "San Franciso Incident Reports"
+author: "ADAMU Farida"
+date: "2023-01-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+We are working with data from San Francisco’s Police Department on Crimes Reported between 2018 and 2022.
+
+We are exploring the data set to answer the following questions:
+
+#### Question
+1. Which Year Had the Highest Reported Incidents?
+2. Which Crimes were the most reported?
+3. Which Police District Had the Most Reports? 
+4. What is the the resolution status for each of the years? 
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+#import needed libraries
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+getwd()
+setwd("/Users/faridaadamu/Documents/San_Francisco_Incidents")
+dir(path = "Data")
+file_path = file.path("Data", "Police_Department_Incident_Reports__2018_to_Present.csv")
+incidents = read.csv(file = file_path, stringsAsFactors = FALSE)
+View(incidents)
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+dim(incidents)  #tells us the number of rows anc columns 
+```
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+#we separate the report datetime column to two different cols. 
+incidents$Report.Date <- as.Date(incidents$Report.Datetime)  
+incidents$Report.Time <- format(as.POSIXct(incidents$Report.Datetime),
+                                format = "%H:%M:%S")
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+#we select the columns we are interested in working with to answer our questions
+incidents_table <- incidents %>% 
+  select(Incident.Year, Incident.Category,Incident.Description,
+          Resolution, Police.District, Longitude, Latitude) %>% 
+  na.omit()
+View(incidents_table)
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+#change the class type for year to make future computation easier
+incidents_table$Incident.Year <- as.character(incidents_table$Incident.Year)
+class(incidents_table$Incident.Year)
+```
+
+Here, we compute the incident reports by year, to see the year with highest number of reported incidents. We note that this year is 2018 and 2020 has the lowest. This can be explained easily by the COVID-19 pandemic. 
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+Incident_Year <-incidents_table %>% 
+  select(Incident.Year) %>% 
+  count(Incident.Year) %>% 
+  arrange(desc(n)) 
+  Incident_Year%>% kbl(col.names = c("Incident Year", "Number of Reports"),caption = "Total Number of Incidents Reported In Each Year") %>%
+  kable_styling(font_size = 12)
+```
+
+This table shows the top 5 incident categories in a tabular form. We use the Kable Extra Library. We note that Lacerny theft has the highest number of incident reports across all the years. 
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+highest_incidents <-incidents_table %>% 
+  select(Incident.Category) %>% 
+  count(Incident.Category)%>% 
+  arrange(desc(n)) %>% 
+  head(n=5)
+library(kableExtra)
+highest_incidents%>% kbl(col.names = c("Incident Category", "Number of Reports"), caption = "Top 5 Incidents Reported") %>% 
+  kable_styling(bootstrap_options = c("striped"),font_size = 12)
+```
+
+Here, we see how incidents were reported by Police district. We note that "Central" has the highest number of reports. We can infer that it based on it's location, this particular district will rightly get more reports than the others due to factors like population. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+police_districts<- incidents_table %>%  
+  filter(Incident.Category == "Larceny Theft") %>% 
+  select(Incident.Year, Incident.Category,Incident.Description,
+          Resolution, Police.District, Longitude, Latitude)
+ggplot(police_districts, mapping = aes(y=Police.District)) + 
+  geom_bar(fill = "#00AFBB") +
+  labs(title = "Incident Reports by Police Districts", x = "Count of Reports", y = "Police District")+
+  theme(axis.line = element_line(),
+        strip.background = element_blank(),
+        strip.text = element_text(face = "bold"),
+        panel.grid.major.y = element_line(color = "grey", linetype = "dotdash"),
+        panel.background = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, face = "italic")
+  )
+```
+
+We want to see the resolution status of incidents across the years.
+We note that "Open and Active" is the most common resolution status and that the year 2018 carried the highest number. 
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+#we want to group by Resolution
+Report_Resolution <- incidents_table %>% 
+  dplyr::group_by(Resolution) %>% 
+  summarise(count = n())
+library(kableExtra)
+Report_Resolution%>% kbl(col.names = c("Police District", "Number of Reports"),caption = "Count of Incidence Resolution Status") %>% kable_styling(bootstrap_options = c("striped"),font_size = 12)
+```
+
+We want to see the results of the table above in a column chat. 
+  
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+resolution_counts <- incidents_table %>% 
+  count( Resolution, Incident.Year) %>% 
+  ggplot(resolution_counts, mapping=aes( Incident.Year,n, fill=Resolution))+
+  geom_col(position="dodge") +
+  labs(title = "Resolution Status of Incidents by year", x = "Year", y = "Number of Lacerny Thefts")+
+  theme(axis.line = element_line(),
+        strip.background = element_blank(),
+        strip.text = element_text(face = "bold"),
+        panel.grid.major.y = element_line(color = "grey", linetype = "dotdash"),
+        panel.background = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, face = "italic")
+)
+resolution_counts
+```
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+sf_map_20 <- incidents_table %>% 
+filter(Incident.Year == 2020 & Incident.Category == "Assault")
+```
+
+Finally, we attempt to plot a map of Assualt reports in 2020. Hover over each point for more information about it. 
+
+```{r echo=FALSE, message=FALSE,warning=FALSE}
+library(sf)
+library(mapview)
+mapview(sf_map_20, xcol = "Longitude", ycol = "Latitude", crs = 4269, grid = FALSE)
+```
+
